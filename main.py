@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 
@@ -67,7 +68,7 @@ async def application_received(update: Update, context: ContextTypes.DEFAULT_TYP
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
-def main():
+async def main():
     application = Application.builder().token(BOT_TOKEN).build()
     
     conv_handler = ConversationHandler(
@@ -84,11 +85,17 @@ def main():
     PORT = int(os.environ.get("PORT", 8080))
     WEBHOOK_URL = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook"
     
-    application.run_webhook(
+    await application.initialize()
+    await application.updater.start_webhook(
         listen="0.0.0.0",
         port=PORT,
         webhook_url=WEBHOOK_URL
     )
+    await application.start()
+    
+    # Держим сервер запущенным
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
