@@ -1,2 +1,2 @@
-python-telegram-bot[webhooks]==21.4
-aiohttp==3.10.11
+pyTelegramBotAPI==4.23.0
+Flask==3.0.3
