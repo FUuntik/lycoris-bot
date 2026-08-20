@@ -3,11 +3,12 @@ import logging
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+from aiohttp import web
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-ROLE, APPLICATION = range(2)
+ROLE, APPLICATION_STATE = range(2)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -47,7 +48,7 @@ async def role_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "5. Почему мы?\n\n"
         "Отправь всё одним сообщением."
     )
-    return APPLICATION
+    return APPLICATION_STATE
 
 async def application_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     role = context.user_data.get("role")
@@ -68,6 +69,10 @@ async def application_received(update: Update, context: ContextTypes.DEFAULT_TYP
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
+# Healthcheck для UptimeRobot (отвечает 200 OK на корневой URL)
+async def healthcheck(request):
+    return web.Response(text="OK", status=200)
+
 async def main():
     application = Application.builder().token(BOT_TOKEN).build()
     
@@ -75,7 +80,7 @@ async def main():
         entry_points=[CommandHandler("start", start)],
         states={
             ROLE: [CallbackQueryHandler(role_selected)],
-            APPLICATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, application_received)]
+            APPLICATION_STATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, application_received)]
         },
         fallbacks=[CommandHandler("cancel", cancel)]
     )
@@ -86,13 +91,20 @@ async def main():
     WEBHOOK_URL = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook"
     
     await application.initialize()
+    await application.start()
+    
+    # Создаём aiohttp приложение с healthcheck на корне
+    app = web.Application()
+    app.router.add_get('/', healthcheck)
+    
+    # Запускаем webhook, передавая своё приложение
     await application.updater.start_webhook(
         listen="0.0.0.0",
         port=PORT,
         url_path="webhook",
-        webhook_url=WEBHOOK_URL
+        webhook_url=WEBHOOK_URL,
+        app=app
     )
-    await application.start()
     
     # Держим сервер запущенным
     while True:
