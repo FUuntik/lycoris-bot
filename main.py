@@ -89,6 +89,7 @@ async def main():
     await application.updater.start_webhook(
         listen="0.0.0.0",
         port=PORT,
+        url_path="webhook",
         webhook_url=WEBHOOK_URL
     )
     await application.start()
